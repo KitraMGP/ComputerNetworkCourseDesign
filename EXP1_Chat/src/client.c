@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include "config.h"
+#include "packet.h"
 
 static char send_buf[MAX_BUFF_SIZE] = {0};
 static char recv_buf[MAX_BUFF_SIZE] = {0};
@@ -19,7 +20,7 @@ void* recv_thread(void* arg)
     while (1)
     {
         ssize_t recv_len;
-        recv_len = recv(client_sock, recv_buf, MAX_BUFF_SIZE, 0);
+        recv_len = recv_msg(client_sock, recv_buf, MAX_BUFF_SIZE - 1);
 
         if (recv_len == -1)
         {
@@ -30,7 +31,9 @@ void* recv_thread(void* arg)
             printf("服务端关闭连接，连接终止\n");
             exit(0);
         }
-        printf("收到服务端消息：%s\n", recv_buf);
+        recv_buf[recv_len] = '\0';
+        printf("%s", recv_buf);
+        fflush(stdout);
     }
 }
 
@@ -68,11 +71,7 @@ int client_main()
         close(client_sock);
         exit(3);
     }
-
-    // // 输入名字
-    // printf("\n请输入名字：");
-    // fgets(send_buf, MAX_BUFF_SIZE, stdin);
-    // send(client_sock, send_buf, strlen(send_buf) + 1, 0);
+    pthread_detach(recv_thread_handle);
 
     // 读取和发送消息
     while(1)
@@ -96,7 +95,7 @@ int client_main()
             close(client_sock);
             break;
         }
-        send(client_sock, send_buf, strnlen(send_buf, MAX_BUFF_SIZE) + 1, 0);
+        send_msg(client_sock, send_buf, strnlen(send_buf, MAX_BUFF_SIZE));
     }
 
     return 0;

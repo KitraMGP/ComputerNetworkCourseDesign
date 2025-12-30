@@ -9,8 +9,8 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include "config.h"
+#include "packet.h"
 
-// 每个进程独立存储一份副本，避免竞争
 static __thread char send_buf[MAX_BUFF_SIZE] = {0};
 static __thread char recv_buf[MAX_BUFF_SIZE] = {0};
 
@@ -115,14 +115,36 @@ bool session_list_set_name(int sock, const char* name)
     }
     if (pos->sock == sock)
     {
-        strncpy(pos->name, name, MAX_BUFF_SIZE);
+        strncpy(pos->name, name, MAX_NAME_LEN);
+        pthread_rwlock_unlock(&session_list.rwlock);
         return true;
     }
     else
     {
+        pthread_rwlock_unlock(&session_list.rwlock);
         return false;
     }
-    pthread_rwlock_unlock(&session_list.rwlock);
+}
+
+// 获取一个会话的名字，如果会话不存在，返回 NULL
+const char* session_list_get_name(int sock)
+{
+    pthread_rwlock_rdlock(&session_list.rwlock);
+    struct list_node *pos = session_list.first;
+    while (pos != NULL && pos->sock != sock)
+    {
+        pos = pos->next;
+    }
+    if (pos->sock == sock)
+    {
+        pthread_rwlock_unlock(&session_list.rwlock);
+        return pos->name;
+    }
+    else
+    {
+        pthread_rwlock_unlock(&session_list.rwlock);
+        return "NULL";
+    }
 }
 
 // 判断字符串是否全为空白字符
@@ -139,14 +161,17 @@ bool is_blank(const char* str, size_t buff_max_size)
     return true;
 }
 
-// 向除 exclude 外的所有客户端 socket 发送消息
-void broadcast_message(int exclude)
+// 向所有客户端 socket 发送消息
+void broadcast_message(const char* message)
 {
-}
-
-// 处理客户端发来的信息
-void process_message(int sock, const char *message)
-{
+    pthread_rwlock_rdlock(&session_list.rwlock);
+    struct list_node* pos = session_list.first;
+    while (pos != NULL)
+    {
+        send_msg(pos->sock, message, strnlen(message, MAX_BUFF_SIZE));
+        pos = pos->next;
+    }
+    pthread_rwlock_unlock(&session_list.rwlock);
 }
 
 // 为一个会话服务的线程
@@ -156,52 +181,87 @@ void *session_thread(void *sock_ptr)
     free(sock_ptr);
     // 用户是否已设置名称
     bool set_name = false;
-    static char* welcome_msg = "欢迎来到聊天室！\n";
+    static char* welcome_msg = "\n欢迎来到聊天室！\n";
     static char* name_prompt = "请输入你的名字：";
-    static char* name_too_long_msg = "名字过长，请重新输入\n请输入你的名字：";
-    static char* name_is_empty_msg = "名字不能为空\n请输入你的名字：";
-    send(sock, welcome_msg, strlen(welcome_msg), 0);
-    send(sock, name_prompt, strlen(name_prompt), 0);
+    static char* name_too_long_msg = "名字过长，请重新输入\n";
+    static char* name_is_empty_msg = "名字不能为空\n";
+    static char* successful_msg = "设置成功！\n";
+    send_msg(sock, welcome_msg, strlen(welcome_msg));
+    send_msg(sock, name_prompt, strlen(name_prompt));
 
     while (1)
     {
         ssize_t recv_len;
-        recv_len = recv(sock, recv_buf, MAX_BUFF_SIZE, 0);
+        recv_len = recv_msg(sock, recv_buf, MAX_BUFF_SIZE - 1);
 
         if (recv_len == -1)
         {
-            printf("数据接收失败\n");
+            printf("客户端 %d 数据接收失败\n", sock);
         }
         else if (recv_len == 0)
         {
-            printf("客户端关闭连接，连接终止\n");
+            printf("客户端 %d 关闭连接，连接终止\n", sock);
+            // 广播用户退出消息
+            if (set_name)
+            {
+                snprintf(send_buf, MAX_BUFF_SIZE, "用户 %s 退出聊天室\n", session_list_get_name(sock));
+            }
+            broadcast_message(send_buf);
             break;
         }
         // 若 set_name 为 false 则将收到的字符串设为用户名
+        recv_buf[recv_len] = '\0';
         if (!set_name)
         {
             // 名字过长
-            if (strnlen(recv_buf, MAX_BUFF_SIZE) > MAX_NAME_LEN)
+            if (strnlen(recv_buf, MAX_BUFF_SIZE) > MAX_NAME_LEN - 1)
             {
-                send(sock, name_too_long_msg, strlen(name_too_long_msg), 0);
+                send_msg(sock, name_too_long_msg, strlen(name_too_long_msg));
+                send_msg(sock, name_prompt, strlen(name_prompt));
                 continue;
             }
             // 名字字符串全为空白字符
             if (is_blank(recv_buf, MAX_BUFF_SIZE))
             {
-                send(sock, name_is_empty_msg, strlen(name_is_empty_msg), 0);
+                send_msg(sock, name_is_empty_msg, strlen(name_is_empty_msg));
+                send_msg(sock, name_prompt, strlen(name_prompt));
                 continue;
             }
+            // 设置名字
             session_list_set_name(sock, recv_buf);
+            set_name = true;
+            printf("客户端 %d 设置了名字 %s\n", sock, recv_buf);
+            send_msg(sock, successful_msg, strlen(successful_msg));
+            // 广播用户加入聊天室的消息
+            snprintf(send_buf, MAX_BUFF_SIZE, "用户 %s 加入聊天室\n", recv_buf);
+            broadcast_message(send_buf);
+            continue;
         }
-        printf("客户端发送消息：%s\n", recv_buf);
-        send(sock, "收到消息", sizeof("收到消息"), 0);
+
+        // 服务端打印消息
+        if (set_name)
+        {
+            const char* name = session_list_get_name(sock);
+            printf("客户端 %d 昵称 %s 发送消息：%s\n", sock, name, recv_buf);
+        }
+        else
+        {
+            printf("客户端 %d 发送消息：%s\n", sock, recv_buf);
+        }
+        
+        // 发送回显
+        //send(sock, recv_buf, strnlen(recv_buf, MAX_BUFF_SIZE) + 1, 0);
+        // 广播消息 [用户名] 消息内容\n
+        char* tmp_buf = malloc(MAX_BUFF_SIZE);
+        snprintf(tmp_buf, MAX_BUFF_SIZE, "[%s] %s\n", session_list_get_name(sock), recv_buf);
+        broadcast_message(tmp_buf);
+        free(tmp_buf);
     }
 
     // 连接关闭后的操作
     if (!session_list_remove(sock))
     {
-        printf("从 session_list 移除元素失败\n");
+        printf("从 session_list 移除元素 %d 失败\n", sock);
     }
 }
 
@@ -220,6 +280,15 @@ int server_main()
         exit(1);
     }
     printf("socket 创建成功\n");
+
+    // 设置 SO_REUSEADDR 选项，允许地址重用
+    // 这样服务器终止后可以立即重新启动，不必等待 TIME_WAIT 结束
+    int opt = 1;
+    if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+    {
+        printf("setsockopt 失败！\n");
+        exit(1);
+    }
 
     // 2. 初始化 serverAddr 并 bind
     memset(&server_addr, 0, sizeof(server_addr));
@@ -252,7 +321,14 @@ int server_main()
         pthread_t session_thread_handle;
         int *sock_arg = malloc(sizeof(int));
         *sock_arg = client_sock;
-        pthread_create(&session_thread_handle, NULL, session_thread, sock_arg);
+        if (pthread_create(&session_thread_handle, NULL, session_thread, sock_arg) == 0)
+        {
+            pthread_detach(session_thread_handle);
+        }
+        else
+        {
+            printf("会话服务线程创建失败\n");
+        }
     }
 
     return 0;
