@@ -249,8 +249,6 @@ void *session_thread(void *sock_ptr)
             printf("客户端 %d 发送消息：%s\n", sock, recv_buf);
         }
         
-        // 发送回显
-        //send(sock, recv_buf, strnlen(recv_buf, MAX_BUFF_SIZE) + 1, 0);
         // 广播消息 [用户名] 消息内容\n
         char* tmp_buf = malloc(MAX_BUFF_SIZE);
         snprintf(tmp_buf, MAX_BUFF_SIZE, "[%s] %s\n", session_list_get_name(sock), recv_buf);
