@@ -6,10 +6,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 #include "config.h"
 #include "packet.h"
 
-static char send_buf[MAX_BUFF_SIZE] = {0};
 static char recv_buf[MAX_BUFF_SIZE] = {0};
 
 int client_sock = -1;
@@ -73,29 +74,43 @@ int client_main()
     }
     pthread_detach(recv_thread_handle);
 
-    // 读取和发送消息
-    while(1)
+    // 使用 readline 读取输入
+    char* input_line = NULL;
+
+    while (1)
     {
-        fgets(send_buf, MAX_BUFF_SIZE, stdin);
-        
-        size_t len = strnlen(send_buf, MAX_BUFF_SIZE);
-        // 忽略空消息
-        if (len == 1 && send_buf[0] == '\n')
+        // 使用 readline 读取输入，input_line 在使用完后需要手动释放
+        input_line = readline("");
+
+        if (input_line == NULL)
         {
+            printf("\n");
+            break;
+        }
+
+        // 忽略空消息
+        size_t len = strlen(input_line);
+        if (len == 0)
+        {
+            free(input_line);
             continue;
         }
-        // 去除字符串尾部换行符
-        if (len > 0 && send_buf[len - 1] == '\n')
+
+        // 退出命令
+        if (strcmp(input_line, "/quit") == 0)
         {
-            send_buf[len - 1] = '\0';
-        }
-        // 退出
-        if (strcmp(send_buf, "/quit") == 0)
-        {
+            free(input_line);
             close(client_sock);
             break;
         }
-        send_msg(client_sock, send_buf, strnlen(send_buf, MAX_BUFF_SIZE));
+
+        // 发送消息
+        send_msg(client_sock, input_line, len);
+
+        // 添加到历史记录
+        add_history(input_line);
+
+        free(input_line);
     }
 
     return 0;

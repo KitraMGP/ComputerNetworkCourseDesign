@@ -3,11 +3,13 @@ add_rules("mode.debug", "mode.release")
 target("Client")
     set_kind("binary")
     add_files("src/*.c")
+    add_syslinks("readline", "pthread")
     set_runargs("--client")
 
 target("Server")
     set_kind("binary")
     add_files("src/*.c")
+    add_syslinks("readline", "pthread")
     set_runargs("--server")
 
 --
