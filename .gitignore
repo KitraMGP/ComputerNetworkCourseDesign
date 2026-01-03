@@ -1,0 +1,29 @@
+# Xmake cache
+.xmake/
+*/build/
+
+# MacOS Cache
+.DS_Store
+
+# VSCode (optional - remove if you want to commit these)
+.vscode/c_cpp_properties.json
+.vscode/compile_commands.json
+
+# Compile commands
+compile_commands.json
+
+# Common build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.a
+*.lib
+*.so
+*.dylib
+
+# Debug files
+*.su
+*.idb
+*.pdb
