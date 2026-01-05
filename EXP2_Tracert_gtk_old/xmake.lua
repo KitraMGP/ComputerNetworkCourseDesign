@@ -1,13 +1,9 @@
 add_rules("mode.debug", "mode.release")
 
--- 添加 GTK4 依赖包
-add_requires("gtk4")
-
-target("EXP7_WebServer")
+target("EXP2_Tracert")
     set_kind("binary")
-    set_languages("c23")
-    add_files("src/*.c")
-    add_packages("gtk4")
+    set_languages("c++23")
+    add_files("src/*.cpp")
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io

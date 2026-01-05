@@ -1,13 +1,9 @@
 add_rules("mode.debug", "mode.release")
 
 target("EXP2_Tracert")
-    add_rules("qt.widgetapp")
-    add_headerfiles("src/*.h")
+    set_kind("binary")
     set_languages("c++23")
     add_files("src/*.cpp")
-    add_files("src/ui/*.ui")
-    -- add files with Q_OBJECT meta (only for qt.moc)
-    add_files("src/mainwindow.h")
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
