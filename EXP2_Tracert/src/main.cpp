@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QStyleFactory>
 #include <QStyle>
+#include <qtablewidget.h>
 
 int main(int argc, char *argv[]) {
 
