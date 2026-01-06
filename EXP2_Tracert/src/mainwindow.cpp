@@ -128,7 +128,7 @@ void MainWindow::startWorker(const vector<string> ipList) {
     // 重置进度条
     ui->progressBar->setValue(0);
     // 创建worker并移动到worker线程
-    this->worker = new ScanWorker();
+    this->worker = new ScanWorker(nullptr, ipList);
     this->workerThread = new QThread(this);
     this->worker->moveToThread(this->workerThread);
     // 设置信号槽连接
@@ -147,9 +147,7 @@ void MainWindow::startWorker(const vector<string> ipList) {
     });
     // 启动worker
     this->workerThread->start();
-    QMetaObject::invokeMethod(this->worker, [this, ipList]() {
-        this->worker->startScan(ipList);
-    }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(this->worker, &ScanWorker::startScan, Qt::QueuedConnection);
 }
 
 MainWindow::~MainWindow() {

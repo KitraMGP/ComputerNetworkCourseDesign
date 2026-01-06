@@ -3,13 +3,13 @@
 
 using std::vector, std::string;
 
-ScanWorker::ScanWorker(QObject *parent) {
-
+ScanWorker::ScanWorker(QObject *parent, const vector<string> ipList) : QObject(parent) {
+    this->ipList = ipList;
 }
 
-void ScanWorker::startScan(const vector<string> ipList) {
+void ScanWorker::startScan() {
     for(int i = 0; i <= 100; i++) {
-        QThread::sleep(30);
+        QThread::msleep(20);
         emit scanProgress(i);
     }
     emit scanFinished();

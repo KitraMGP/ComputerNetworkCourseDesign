@@ -2,6 +2,8 @@
 #define SCAN_WORKER_H
 
 #include <QObject>
+#include <string>
+#include <vector>
 
 using std::vector, std::string;
 
@@ -9,7 +11,7 @@ class ScanWorker : public QObject {
     Q_OBJECT
 
   public:
-    explicit ScanWorker(QObject *parent = nullptr);
+    explicit ScanWorker(QObject *parent, vector<string> ipList);
 
   signals:
     void scanProgress(const int percent);
@@ -17,7 +19,10 @@ class ScanWorker : public QObject {
     void scanFinished();
 
   public slots:
-    void startScan(const vector<string> ipList);
+    void startScan();
+  
+  private:
+    vector<string> ipList;
 
 };
 
