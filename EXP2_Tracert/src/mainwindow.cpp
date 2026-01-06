@@ -48,7 +48,11 @@ void MainWindow::onScanButtonClicked() {
     startWorker(scanIPs);
 }
 
-void MainWindow::onStopScanButtonClicked() {}
+void MainWindow::onStopScanButtonClicked() {
+    if (this->worker) {
+        this->worker->stopWorker();
+    }
+}
 
 void MainWindow::updateProgress(const int progress) {
     ui->progressBar->setValue(progress);

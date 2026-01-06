@@ -5,13 +5,14 @@
 #include <string>
 #include <vector>
 
-using std::vector, std::string;
+using std::vector, std::string, std::atomic_bool;
 
 class ScanWorker : public QObject {
     Q_OBJECT
 
   public:
     explicit ScanWorker(QObject *parent, vector<string> ipList);
+    void stopWorker();
 
   signals:
     void scanProgress(const int percent);
@@ -23,7 +24,7 @@ class ScanWorker : public QObject {
   
   private:
     vector<string> ipList;
-
+    atomic_bool requestedStop = false;
 };
 
 #endif // SCAN_WORKER_H
