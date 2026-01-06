@@ -2,15 +2,16 @@ add_rules("mode.debug", "mode.release")
 
 target("EXP2_Tracert")
     add_rules("qt.widgetapp")
+    add_packages("qt6widgets", "qt6core", "qt6gui")
     add_headerfiles("src/**.h")
     set_languages("c++23")
+    add_includedirs("src")
     add_files("src/**.cpp")
     add_files("src/ui/*.ui")
     -- add files with Q_OBJECT meta (only for qt.moc)
-    add_files("src/mainwindow.h")
+    add_files("src/*.h")
 
-    -- 确保 Qt 6 模块正确链接
-    add_syslinks("Qt6Widgets", "Qt6Core", "Qt6Gui")
+    add_syslinks("Qt6Widgets", "Qt6Core", "Qt6Gui", "z")
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io

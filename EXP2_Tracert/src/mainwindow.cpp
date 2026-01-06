@@ -2,6 +2,8 @@
 #include "ui_mainwindow.h"
 #include <QMessageBox>
 #include <string>
+#include <scanworker.h>
+#include <QThread>
 
 using std::string;
 
@@ -20,13 +22,55 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     // 信号和槽连接
     connect(ui->startScanBtn, &QPushButton::clicked, this, &MainWindow::onScanButtonClicked);
+    connect(ui->stopScanBtn, &QPushButton::clicked, this, &MainWindow::onStopScanButtonClicked);
+
+    this->worker = nullptr;
+    this->workerThread = nullptr;
 }
 
 void MainWindow::onScanButtonClicked() {
-    validateInputs();
+    // 输入参数不合法，结束操作
+    if (!validateInputs()) {
+        return;
+    }
+
+    // 禁用开始扫描按钮，启用停止扫描按钮
+    this->ui->startScanBtn->setEnabled(false);
+    this->ui->stopScanBtn->setEnabled(true);
+
+    // 清空扫描结果
+    clearScanResults();
+
+    // 生成IP地址范围
+    vector<string> scanIPs = getScanIPs();
+
+    // 创建Worker开始扫描
+    startWorker(scanIPs);
+}
+
+void MainWindow::onStopScanButtonClicked() {}
+
+void MainWindow::updateProgress(const int progress) {
+    ui->progressBar->setValue(progress);
+}
+
+void MainWindow::receiveNewIP(const string ip) {
+    // 为table增加一行并插入数据
+    int count = ui->tableWidget->rowCount();
+    ui->tableWidget->setRowCount(count + 1);
+    ui->tableWidget->setItem(count, 0, new QTableWidgetItem(QString::fromStdString(ip)));
+}
+
+void MainWindow::scanFinished() {
+    // 设置进度条
+    ui->progressBar->setValue(100);
+    // 禁用停止按钮，启用开始按钮
+    ui->stopScanBtn->setEnabled(false);
+    ui->startScanBtn->setEnabled(true);
 }
 
 bool MainWindow::validateInputs() {
+    // 检验IP地址范围是否合法
     string ip1, ip2, ip3, ip4, ip5;
     ip1 = this->ui->ipLineEdit_1->text().toStdString();
     ip2 = this->ui->ipLineEdit_2->text().toStdString();
@@ -43,12 +87,69 @@ bool MainWindow::validateInputs() {
             QMessageBox::information(this, "提示", "输入的IP地址范围不合法", QMessageBox::StandardButton::Ok);
             return false;
         }
-    } catch (std::invalid_argument) {
+    } catch (std::exception) {
         QMessageBox::information(this, "提示", "输入的IP地址范围不合法", QMessageBox::StandardButton::Ok);
         return false;
     }
-
+    // 检验timeout是否合法
+    int timeout;
+    try {
+        timeout = std::stoi(this->ui->timeoutLineEdit->text().toStdString());
+    } catch (std::exception) {
+        QMessageBox::information(this, "提示", "输入的超时时间不合法", QMessageBox::StandardButton::Ok);
+        return false;
+    }
+    // 设置输入的参数
+    this->ipInput1 = ip1;
+    this->ipInput2 = ip2;
+    this->ipInput3 = ip3;
+    this->ipInput4 = ip4;
+    this->ipInput5 = ip5;
+    this->timeout = timeout;
     return true;
+}
+
+vector<string> MainWindow::getScanIPs() {
+    int ip4num = std::stoi(this->ipInput4);
+    int ip5num = std::stoi(this->ipInput5);
+    vector<string> ipList;
+    for (int i = ip4num; i <= ip5num; i++) {
+        string ipString = ipInput1 + '.' + ipInput2 + '.' + ipInput3 + '.' + std::to_string(i);
+        ipList.push_back(ipString);
+    }
+    return ipList;
+}
+
+void MainWindow::clearScanResults() {
+    ui->tableWidget->clearContents();
+}
+
+void MainWindow::startWorker(const vector<string> ipList) {
+    // 重置进度条
+    ui->progressBar->setValue(0);
+    // 创建worker并移动到worker线程
+    this->worker = new ScanWorker();
+    this->workerThread = new QThread(this);
+    this->worker->moveToThread(this->workerThread);
+    // 设置信号槽连接
+    connect(worker, &ScanWorker::scanProgress, this, &MainWindow::updateProgress);
+    connect(worker, &ScanWorker::addIP, this, &MainWindow::receiveNewIP);
+    // 工作完成后自动结束线程
+    connect(worker, &ScanWorker::scanFinished, workerThread, &QThread::quit);
+    // 线程结束后删除worker对象
+    connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
+    // 线程结束后清理MainWindow中的资源
+    connect(workerThread, &QThread::finished, this, [this]() {
+        // 清理资源
+        this->worker = nullptr;
+        this->workerThread = nullptr;
+        this->scanFinished();
+    });
+    // 启动worker
+    this->workerThread->start();
+    QMetaObject::invokeMethod(this->worker, [this, ipList]() {
+        this->worker->startScan(ipList);
+    }, Qt::QueuedConnection);
 }
 
 MainWindow::~MainWindow() {
