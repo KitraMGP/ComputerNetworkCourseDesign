@@ -2,8 +2,6 @@
 
 本项目依赖 Qt6。
 
-使用 VSCode 开发前请先运行 `xmake project -k compile_commands` 生成 `compile_commands.json` 确保 VSCode 能正确检查代码。
-
 ## 运行和调试
 
 执行 `xmake` 进行构建，还需要执行`sudo setcap cap_net_raw+ep build/linux/x86_64/debug/EXP2_Tracert`命令来为其添加创建rawsocket的权限。
