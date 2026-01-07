@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "core/networkscan.h"
 #include "ui_mainwindow.h"
 #include <QMessageBox>
 #include <string>
@@ -63,6 +64,13 @@ void MainWindow::receiveNewIP(const string ip) {
     int count = ui->tableWidget->rowCount();
     ui->tableWidget->setRowCount(count + 1);
     ui->tableWidget->setItem(count, 0, new QTableWidgetItem(QString::fromStdString(ip)));
+    ui->tableWidget->setItem(count, 3, new QTableWidgetItem("在线"));
+    // 获取MAC地址
+    string mac = getmac(ip);
+    ui->tableWidget->setItem(count, 1, new QTableWidgetItem(QString::fromStdString(mac)));
+    // 获取主机名
+    string hostname = gethostname(ip);
+    ui->tableWidget->setItem(count, 2, new QTableWidgetItem(QString::fromStdString(hostname)));
 }
 
 void MainWindow::scanFinished() {
@@ -125,14 +133,14 @@ vector<string> MainWindow::getScanIPs() {
 }
 
 void MainWindow::clearScanResults() {
-    ui->tableWidget->clearContents();
+    ui->tableWidget->setRowCount(0);
 }
 
 void MainWindow::startWorker(const vector<string> ipList) {
     // 重置进度条
     ui->progressBar->setValue(0);
     // 创建worker并移动到worker线程
-    this->worker = new ScanWorker(nullptr, ipList);
+    this->worker = new ScanWorker(nullptr, ipList, timeout);
     this->workerThread = new QThread(this);
     this->worker->moveToThread(this->workerThread);
     // 设置信号槽连接
@@ -155,5 +163,11 @@ void MainWindow::startWorker(const vector<string> ipList) {
 }
 
 MainWindow::~MainWindow() {
+    if (this->workerThread) {
+        this->workerThread->terminate();
+        this->workerThread->wait();
+    }
+    this->worker = nullptr;
+    delete this->workerThread;
     delete ui;
 }

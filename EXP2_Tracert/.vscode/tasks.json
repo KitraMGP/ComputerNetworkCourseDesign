@@ -1,0 +1,14 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        // 运行这个任务，以在构建的同时为可执行文件设置cap_net_raw=ep，获得创建rawsocket的能力
+        {
+            "label": "构建",
+            "type": "shell",
+            "command": "xmake && sudo setcap cap_net_raw+ep ${workspaceFolder}/build/linux/x86_64/debug/EXP2_Tracert",
+            "problemMatcher": []
+        }
+    ]
+}

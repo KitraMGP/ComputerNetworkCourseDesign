@@ -11,7 +11,7 @@ class ScanWorker : public QObject {
     Q_OBJECT
 
   public:
-    explicit ScanWorker(QObject *parent, vector<string> ipList);
+    explicit ScanWorker(QObject *parent, vector<string> ipList, int timeout);
     void stopWorker();
 
   signals:
@@ -24,6 +24,7 @@ class ScanWorker : public QObject {
   
   private:
     vector<string> ipList;
+    int timeout;
     atomic_bool requestedStop = false;
 };
 
