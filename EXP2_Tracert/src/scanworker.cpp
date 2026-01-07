@@ -14,10 +14,10 @@ void ScanWorker::startScan() {
         if (this->requestedStop)
             break;
         //QThread::msleep(20);
+        emit scanProgress(floor((float)i / ipList.size() * 100));
         if (ping(ipList[i], timeout)) {
             emit addIP(ipList[i]);
         }
-        emit scanProgress(floor((float)i / ipList.size() * 100));
     }
     emit scanFinished();
 }

@@ -24,6 +24,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     // 信号和槽连接
     connect(ui->startScanBtn, &QPushButton::clicked, this, &MainWindow::onScanButtonClicked);
     connect(ui->stopScanBtn, &QPushButton::clicked, this, &MainWindow::onStopScanButtonClicked);
+    connect(ui->clearScanResultsBtn, &QPushButton::clicked, this, &MainWindow::clearScanResults);
 
     this->worker = nullptr;
     this->workerThread = nullptr;
@@ -71,6 +72,8 @@ void MainWindow::receiveNewIP(const string ip) {
     // 获取主机名
     string hostname = gethostname(ip);
     ui->tableWidget->setItem(count, 2, new QTableWidgetItem(QString::fromStdString(hostname)));
+    // 更新主机数量
+    ui->scannedCountLabel->setText(QString::fromStdString(std::to_string(count + 1)));
 }
 
 void MainWindow::scanFinished() {
@@ -134,6 +137,7 @@ vector<string> MainWindow::getScanIPs() {
 
 void MainWindow::clearScanResults() {
     ui->tableWidget->setRowCount(0);
+    ui->scannedCountLabel->setText("0");
 }
 
 void MainWindow::startWorker(const vector<string> ipList) {

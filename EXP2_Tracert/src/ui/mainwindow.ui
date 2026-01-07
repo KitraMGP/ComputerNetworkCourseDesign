@@ -299,13 +299,6 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="scanStatusLabel">
-        <property name="text">
-         <string>已停止扫描</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QLabel" name="label_6">
         <property name="text">
          <string/>
