@@ -140,7 +140,7 @@ void ServerTask::processHttpRequest(HttpRequest* request) {
         if (filePath == "404") {
             QByteArray content;
             content.append(
-                QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>404 Not Found</h1><p>请求的文件 %1 不存在</p></body></html>").arg(path).toUtf8());
+                QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>404 Not Found</h1><p>请求的资源 %1 不存在</p></body></html>").arg(path).toUtf8());
             sendResponse(404, "Not Found", &content, "text/html", "");
             return;
         } else if (filePath == "403") {
@@ -173,7 +173,30 @@ void ServerTask::processHttpRequest(HttpRequest* request) {
         }
         
     } else if (method == "POST") {
-
+        // 测试 POST 接口
+        if (path == "/testPostApi") {
+            // 读取表单
+            QList<QByteArray> fields = request->body.split('&');
+            QString name;
+            if (fields.size() > 0) {
+                // 找到name字段
+                for (QString field : fields) {
+                    if (field.startsWith("name=")) {
+                        name = field.mid(5, field.size() - 1);
+                        break;
+                    }
+                }
+            }
+            QByteArray content;
+            content.append(QString("Hello %1!").arg(name).toUtf8());
+            sendResponse(200, "OK", &content, "text/plain", "");
+        } else {
+            QByteArray content;
+            content.append(
+                QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>404 Not Found</h1><p>请求的资源 %1 不存在</p></body></html>").arg(path).toUtf8());
+            sendResponse(404, "Not Found", &content, "text/html", "");
+            return;
+        }
     } else {
         QByteArray content;
         content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>405 Method Not Allowed</h1><p>不支持使用 %1 方法</p></body></html>").arg(method).toUtf8());

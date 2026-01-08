@@ -79,6 +79,15 @@ void HttpServerWorker::stopServer() {
         close(serverSock);
         serverSock = -1;
     }
+    // 关闭所有socket
+    threadPool->clear();
+    QMutexLocker locker(&activeConnectionsMutex);
+    for (int sock : activeConnections) {
+        close(sock);
+    }
+    activeConnections.clear();
+    qDebug() << "已关闭所有socket";
+
     // 等待所有任务退出
     if (threadPool) {
         threadPool->waitForDone(1000);

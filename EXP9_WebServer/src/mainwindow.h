@@ -23,6 +23,9 @@ class MainWindow : public QMainWindow {
     void onLogMessage(QString message);
     void onServerStarted();
     void onServerStopped();
+  
+  protected:
+    void closeEvent(QCloseEvent* event) override;
 
   private:
     Ui::MainWindow *ui;

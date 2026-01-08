@@ -16,7 +16,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // 初始化日志打印区域
     ui->logsArea->setReadOnly(true);
     
-
     // 连接信号和槽
     connect(ui->webRootPathBrowseBtn, &QPushButton::clicked, this, &MainWindow::browseServerRootDir);
     connect(ui->startServerBtn, &QPushButton::clicked, this, &MainWindow::onStartServerBtnClicked);
@@ -138,11 +137,14 @@ bool MainWindow::validateInput() {
     return true;
 }
 
-MainWindow::~MainWindow() {
+void MainWindow::closeEvent(QCloseEvent* event) {
     onStopServerBtnClicked();
     if (serverThread) {
         serverThread->quit();
-        serverThread->wait(2000);
+        serverThread->wait(6000);
     }
+}
+
+MainWindow::~MainWindow() {
     delete ui;
 }
