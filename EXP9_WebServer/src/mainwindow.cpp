@@ -15,6 +15,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // 设置输入校验
     ui->setverPortLineEdit->setValidator(new QIntValidator(1, 65535, this));
 
+    // 初始化日志打印区域
+    ui->logsArea->setReadOnly(true);
+    
+
     // 连接信号和槽
     connect(ui->webRootPathBrowseBtn, &QPushButton::clicked, this, &MainWindow::browseServerRootDir);
     connect(ui->startServerBtn, &QPushButton::clicked, this, &MainWindow::onStartServerBtnClicked);
@@ -39,6 +43,8 @@ void MainWindow::onStartServerBtnClicked() {
     }
 
     // 启动服务器
+
+    ui->logsArea->clear();
 
     // 创建线程
     this->serverThread = new QThread(this);
@@ -108,6 +114,7 @@ void MainWindow::onServerStopped() {
 }
 
 void MainWindow::onLogMessage(QString message) {
+    ui->logsArea->appendPlainText(message);
     qDebug() << message;
 }
 

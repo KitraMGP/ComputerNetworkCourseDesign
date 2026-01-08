@@ -8,5 +8,8 @@ ServerTask::ServerTask(int clientSock, QString clientInfo, QObject* parent) : QO
 }
 
 void ServerTask::run() {
+    
 
+    // 操作结束
+    emit taskFinished(clientSock);
 }
