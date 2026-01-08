@@ -158,7 +158,7 @@ void HttpServerWorker::processServerLoop() {
             }
 
             // 创建任务处理客户端请求
-            ServerTask *task = new ServerTask(clientSock, clientInfo);
+            ServerTask *task = new ServerTask(clientSock, rootDir, clientInfo);
             // 连接信号和槽
             connect(task, &ServerTask::taskFinished, this, &HttpServerWorker::serverTaskFinished);
             connect(task, &ServerTask::logMessage, this, &HttpServerWorker::serverTaskLogMessage);

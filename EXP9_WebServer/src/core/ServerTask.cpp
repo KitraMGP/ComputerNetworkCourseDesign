@@ -1,12 +1,18 @@
 #include <ServerTask.h>
 #include <QDebug>
+#include <QFileInfo>
+#include <QFile>
 #include <sys/socket.h>
 #include <errno.h>
 
 using std::string;
 
-ServerTask::ServerTask(int clientSock, QString clientInfo, QObject* parent) : QObject(parent) {
+ServerTask::ServerTask(int clientSock, QString serverRoot, QString clientInfo, QObject* parent) : QObject(parent) {
     this->clientSock = clientSock;
+    if (serverRoot.endsWith("/")) {
+        serverRoot = serverRoot.left(serverRoot.length() - 1);
+    }
+    this->serverRoot = serverRoot;
     this->clientInfo = clientInfo;
     // 设置自动删除
     setAutoDelete(true);
@@ -97,11 +103,35 @@ void ServerTask::processHttpRequest(HttpRequest* request) {
     QString method = firstLineParts[0];
     QString path = firstLineParts[1];
 
+    QString filePath = getFilesystemPath(path);
+    if (filePath == "404") {
+        QByteArray content;
+        content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>404 Not Found</h1><p>请求的文件 %1 不存在</p></body></html>").arg(path).toUtf8());
+        sendResponse(404, "Not Found", &content, "text/html", "");
+        return;
+    } else if (filePath == "403") {
+        QByteArray content;
+        content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>403 Forbidden</h1><p>你没有权限访问位于 %1 的资源</p></body></html>").arg(path).toUtf8());
+        sendResponse(404, "Not Found", &content, "text/html", "");
+        return;
+    }
+
     emit logMessage(QString("已处理来自%1的请求，方法：%2，路径：%3").arg(clientInfo).arg(method).arg(path));
 
     QByteArray content;
-    content.append("<html><head><meta charset=\"UTF-8\"></head><body><h1>It Works!</h1></body></html>");
-    sendResponse(200, "OK", &content, "text/html", "");
+    QString mimeType = getMimeType(filePath);
+    // 读取文件
+    QFile file(filePath);
+    if (file.open(QIODeviceBase::ReadOnly)) {
+        content = file.readAll();
+        sendResponse(200, "OK", &content, mimeType, "");
+    } else {
+        content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>403 Forbidden</h1><p>你没有权限访问位于 %1 的资源</p></body></html>").arg(path).toUtf8());
+        sendResponse(404, "Not Found", &content, "text/html", "");
+    }
+    
+    // content.append("<html><head><meta charset=\"UTF-8\"></head><body><h1>It Works!</h1></body></html>");
+    // sendResponse(200, "OK", &content, "text/html", "");
     return;
 }
 
@@ -128,4 +158,32 @@ bool ServerTask::sendResponse(int code, QString description, QByteArray* content
         send(clientSock, content->constData(), content->size(), 0);
     }
     return true;
+}
+
+QString ServerTask::getFilesystemPath(QString requestPath) {
+    if (!requestPath.startsWith("/")) {
+        return "404";
+    }
+    if (requestPath == "/") {
+        requestPath = "/index.html";
+    }
+    if (requestPath.endsWith("/")) {
+        requestPath += "index.html";
+    }
+    // 判断是否是非法路径
+    if (requestPath.contains("..")) {
+        return "403";
+    }
+    QString filesystemPath = serverRoot + requestPath;
+    // 查询文件信息
+    QFileInfo info(filesystemPath);
+    if (!info.exists() || info.isDir()) {
+        return "404";
+    }
+    return info.absoluteFilePath();
+}
+
+QString ServerTask::getMimeType(QString& filePath) {
+    QFileInfo fileInfo(filePath);
+    return mimeDatabase.mimeTypeForFile(fileInfo).name();
 }
