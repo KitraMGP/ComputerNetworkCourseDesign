@@ -22,29 +22,51 @@ void ServerTask::run() {
     char* recvBuf = new char[8192];
     QByteArray requestData;
     HttpRequest* httpRequest;
-    
+
+    // 设置 30s 接收超时
+    timeval timeout;
+    timeout.tv_sec = 30;
+    timeout.tv_usec = 0;
+    if (setsockopt(clientSock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        qDebug() << "设置 socket 接收超时失败";
+    }
+
     // 接收客户端发来的数据
     while (true) {
         int recvlen = recv(clientSock, recvBuf, sizeof(recvBuf), 0);
         if (recvlen < 0) {
-            qDebug() << "接收数据发生错误：" << strerror(errno);  // 发生错误
+            // 检查是否是超时或暂时性错误
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                // 超时或被信号中断，正常退出长连接
+                break;
+            } else {
+                // 真正的错误
+                qDebug() << "接收数据发生错误：" << strerror(errno);
+            }
+            break;
         } else if (recvlen == 0) {
+            qDebug() << "客户端关闭连接";
             break;  // 连接关闭
         }
         requestData.append(recvBuf, recvlen);
 
-        // 若接收到了完整的 HTTP 请求报文则结束循环
+        // 若接收到了完整的 HTTP 请求报文则处理请求
         httpRequest = parseRequest(requestData);
         if (httpRequest) {
-            break;
+            this->keepAlive = httpRequest->keepAlive;
+            processHttpRequest(httpRequest);
+
+            // 如果是长连接，保留连接继续接收下一次请求
+            if (keepAlive) {
+                requestData.clear();
+                delete httpRequest;
+                httpRequest = nullptr;
+                continue;
+            }
         }
     }
-
-    // 处理 HTTP 请求
-    if (httpRequest) {
-        processHttpRequest(httpRequest);
-    }
     
+    // 连接关闭
     delete recvBuf;
     if (httpRequest) {
         delete httpRequest;
@@ -76,6 +98,15 @@ HttpRequest* ServerTask::parseRequest(const QByteArray& data) {
         }
     }
 
+    // 查找 Connection
+    bool keepAlive = false;
+    for (QByteArray& line : headerLines) {
+        if (line.startsWith("Connection:")) {
+            keepAlive = line.contains("keep-alive");
+            break;
+        }
+    }
+
     // 检查请求体是否完整
     int bodyStart = headerEnd + 4;
     if (data.size() >= bodyStart + contentLength) {
@@ -83,6 +114,7 @@ HttpRequest* ServerTask::parseRequest(const QByteArray& data) {
         result->body = data.mid(bodyStart, contentLength);
         result->contentLength = contentLength;
         result->headerLines = headerLines;
+        result->keepAlive = keepAlive;
         return result;
     } else {
         return nullptr;
@@ -103,50 +135,82 @@ void ServerTask::processHttpRequest(HttpRequest* request) {
     QString method = firstLineParts[0];
     QString path = firstLineParts[1];
 
-    QString filePath = getFilesystemPath(path);
-    if (filePath == "404") {
-        QByteArray content;
-        content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>404 Not Found</h1><p>请求的文件 %1 不存在</p></body></html>").arg(path).toUtf8());
-        sendResponse(404, "Not Found", &content, "text/html", "");
-        return;
-    } else if (filePath == "403") {
-        QByteArray content;
-        content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>403 Forbidden</h1><p>你没有权限访问位于 %1 的资源</p></body></html>").arg(path).toUtf8());
-        sendResponse(404, "Not Found", &content, "text/html", "");
-        return;
-    }
+    if (method == "GET" || method == "HEAD") {
+        QString filePath = getFilesystemPath(path);
+        if (filePath == "404") {
+            QByteArray content;
+            content.append(
+                QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>404 Not Found</h1><p>请求的文件 %1 不存在</p></body></html>").arg(path).toUtf8());
+            sendResponse(404, "Not Found", &content, "text/html", "");
+            return;
+        } else if (filePath == "403") {
+            QByteArray content;
+            content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>403 Forbidden</h1><p>你没有权限访问位于 %1 的资源</p></body></html>").arg(path).toUtf8());
+            sendResponse(404, "Not Found", &content, "text/html", "");
+            return;
+        }
 
-    emit logMessage(QString("已处理来自%1的请求，方法：%2，路径：%3").arg(clientInfo).arg(method).arg(path));
+        emit logMessage(QString("已处理来自%1的请求，方法：%2，路径：%3").arg(clientInfo).arg(method).arg(path));
 
-    QByteArray content;
-    QString mimeType = getMimeType(filePath);
-    // 读取文件
-    QFile file(filePath);
-    if (file.open(QIODeviceBase::ReadOnly)) {
-        content = file.readAll();
-        sendResponse(200, "OK", &content, mimeType, "");
+        QByteArray content;
+        QString mimeType = getMimeType(filePath);
+        QString date = getDate(filePath);
+
+        if (method == "GET") {
+            // 读取文件
+            QFile file(filePath);
+            if (file.open(QIODeviceBase::ReadOnly)) {
+                content = file.readAll();
+                sendResponse(200, "OK", &content, mimeType, date);
+            } else {
+                content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>403 Forbidden</h1><p>你没有权限访问位于 %1 的资源</p></body></html>").arg(path).toUtf8());
+                sendResponse(404, "Not Found", &content, "text/html", "");
+            }
+        } else {    // HEAD 方法
+            // 获取文件大小
+            QFileInfo fileInfo(filePath);
+            sendResponse(200, "OK", nullptr, mimeType, date, fileInfo.size());
+        }
+        
+    } else if (method == "POST") {
+
     } else {
-        content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>403 Forbidden</h1><p>你没有权限访问位于 %1 的资源</p></body></html>").arg(path).toUtf8());
+        QByteArray content;
+        content.append(QString("<html><head><meta charset=\"UTF-8\"></head><body><h1>405 Method Not Allowed</h1><p>不支持使用 %1 方法</p></body></html>").arg(method).toUtf8());
         sendResponse(404, "Not Found", &content, "text/html", "");
     }
-    
-    // content.append("<html><head><meta charset=\"UTF-8\"></head><body><h1>It Works!</h1></body></html>");
-    // sendResponse(200, "OK", &content, "text/html", "");
+
     return;
 }
 
-bool ServerTask::sendResponse(int code, QString description, QByteArray* content, QString contentType, QString date) {
+bool ServerTask::sendResponse(int code, QString description, QByteArray* content, QString contentType, QString date, int length) {
     // 状态行
-    QString statusLine = QString("HTTP/1.0 %1 %2\r\n").arg(code).arg(description);
+    QString statusLine = QString("HTTP/1.1 %1 %2\r\n").arg(code).arg(description);
     // 响应头
     QString header = QString("Server: MyCustomServer\r\n");
-    if (content != nullptr && content->size() > 0) {
-        header = header.append(QString("Content-Length: %1\r\nContent-Type: %2\r\n").arg(content->size()).arg(contentType));
-    } else {
-        header = header.append("Content-Length: 0\r\n");
+
+    // Content-Length
+    if (content != nullptr) {    // 普通有响应体的响应
+        header = header.append(QString("Content-Length: %1\r\n").arg(content->size()));
+    } else if (length > 0) {    // HEAD 方法
+        header = header.append(QString("Content-Length: %1\r\n").arg(length));
     }
+
+    // Content-Type
+    if (!contentType.isEmpty()) {
+        header = header.append(QString("Content-Type: %1\r\n").arg(contentType));
+    }
+
+    // Date
     if (!date.isEmpty()) {
-        header = header.append(QString("Date: %1").arg(date));
+        header = header.append(QString("Date: %1\r\n").arg(date));
+    }
+
+    // Connection
+    if (this->keepAlive) {
+        header = header.append("Connection: keep-alive\r\n");
+    } else {
+        header = header.append("Connection: close\r\n");
     }
 
     header = header.append("\r\n");
@@ -186,4 +250,9 @@ QString ServerTask::getFilesystemPath(QString requestPath) {
 QString ServerTask::getMimeType(QString& filePath) {
     QFileInfo fileInfo(filePath);
     return mimeDatabase.mimeTypeForFile(fileInfo).name();
+}
+
+QString ServerTask::getDate(QString& filePath) {
+    QFileInfo fileInfo(filePath);
+    return fileInfo.lastModified().toString(Qt::RFC2822Date);
 }
