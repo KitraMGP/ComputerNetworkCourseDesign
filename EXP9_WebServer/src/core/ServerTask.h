@@ -40,7 +40,7 @@ class ServerTask : public QObject, public QRunnable {
         /**
          * 发送响应，返回是否成功。content 可为 nullptr。
          */
-        bool sendResponse(int code, QString description, QByteArray* content, QString contentType);
+        bool sendResponse(int code, QString description, QByteArray* content, QString contentType, QString date);
 };
 
 #endif

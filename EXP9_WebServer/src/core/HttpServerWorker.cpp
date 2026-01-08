@@ -181,6 +181,7 @@ void HttpServerWorker::serverTaskLogMessage(QString message) {
 }
 
 void HttpServerWorker::serverTaskFinished(int socket) {
+    close(socket);
     removeActiveConnection(socket);
 }
 

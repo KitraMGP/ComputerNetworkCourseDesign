@@ -90,7 +90,7 @@ void ServerTask::processHttpRequest(HttpRequest* request) {
         // 第一行格式不正确
         QByteArray content;
         content.append("<html><head><meta charset=\"UTF-8\"></head><body><h1>400 Bad Request</h1><p>请求无效</p></body></html>");
-        sendResponse(400, "Bad Request", &content, "text/html");
+        sendResponse(400, "Bad Request", &content, "text/html", "");
         return;
     }
 
@@ -98,20 +98,25 @@ void ServerTask::processHttpRequest(HttpRequest* request) {
     QString path = firstLineParts[1];
 
     emit logMessage(QString("已处理来自%1的请求，方法：%2，路径：%3").arg(clientInfo).arg(method).arg(path));
-    
+
     QByteArray content;
     content.append("<html><head><meta charset=\"UTF-8\"></head><body><h1>It Works!</h1></body></html>");
-    sendResponse(200, "OK", &content, "text/html");
+    sendResponse(200, "OK", &content, "text/html", "");
     return;
 }
 
-bool ServerTask::sendResponse(int code, QString description, QByteArray* content, QString contentType) {
+bool ServerTask::sendResponse(int code, QString description, QByteArray* content, QString contentType, QString date) {
     // 状态行
     QString statusLine = QString("HTTP/1.0 %1 %2\r\n").arg(code).arg(description);
     // 响应头
     QString header = QString("Server: MyCustomServer\r\n");
     if (content != nullptr && content->size() > 0) {
-        header = header.append("Content-Length: %1\r\nContent-Type: %2\r\n").arg(content->size()).arg(contentType);
+        header = header.append(QString("Content-Length: %1\r\nContent-Type: %2\r\n").arg(content->size()).arg(contentType));
+    } else {
+        header = header.append("Content-Length: 0\r\n");
+    }
+    if (!date.isEmpty()) {
+        header = header.append(QString("Date: %1").arg(date));
     }
 
     header = header.append("\r\n");
