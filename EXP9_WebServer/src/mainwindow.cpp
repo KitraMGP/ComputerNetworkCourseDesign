@@ -6,8 +6,6 @@
 #include <filesystem>
 #include <fstream>
 
-#include "httpserverworker.h"
-
 using std::filesystem::exists, std::filesystem::is_directory, std::stoi;
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow) {

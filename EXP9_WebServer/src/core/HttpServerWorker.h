@@ -53,6 +53,10 @@ class HttpServerWorker : public QObject {
          * ServerTask 完成操作，移除 socket
          */
         void serverTaskFinished(int clientSocket);
+        /**
+         * ServerTask 打印日志
+         */
+        void serverTaskLogMessage(QString message);
     
     private:
         int serverSock = -1;

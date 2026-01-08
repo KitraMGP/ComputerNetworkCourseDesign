@@ -1,5 +1,5 @@
-#include <httpserverworker.h>
-#include <servertask.h>
+#include <HttpServerWorker.h>
+#include <ServerTask.h>
 #include <sys/socket.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -161,6 +161,7 @@ void HttpServerWorker::processServerLoop() {
             ServerTask *task = new ServerTask(clientSock, clientInfo);
             // 连接信号和槽
             connect(task, &ServerTask::taskFinished, this, &HttpServerWorker::serverTaskFinished);
+            connect(task, &ServerTask::logMessage, this, &HttpServerWorker::serverTaskLogMessage);
             addActiveConnection(clientSock);
             // 提交到线程池
             threadPool->start(task);
@@ -173,6 +174,10 @@ void HttpServerWorker::processServerLoop() {
     threadPool->waitForDone(1000);
     qDebug() << "退出服务器主循环！";
     stopServer();
+}
+
+void HttpServerWorker::serverTaskLogMessage(QString message) {
+    emit logMessage(message);
 }
 
 void HttpServerWorker::serverTaskFinished(int socket) {

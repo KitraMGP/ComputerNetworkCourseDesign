@@ -3,7 +3,7 @@
 
 #include <QMainWindow>
 #include <QThread>
-#include <httpserverworker.h>
+#include <HttpServerWorker.h>
 
 namespace Ui {
 class MainWindow;
