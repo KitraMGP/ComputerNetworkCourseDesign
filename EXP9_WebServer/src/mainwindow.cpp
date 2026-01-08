@@ -40,6 +40,31 @@ void MainWindow::onStartServerBtnClicked() {
 
     // 启动服务器
 
+    // 创建线程
+    this->serverThread = new QThread(this);
+    this->serverWorker = new HttpServerWorker();
+    serverWorker->moveToThread(serverThread);
+
+    // 连接信号和槽
+    connect(serverWorker, &HttpServerWorker::logMessage, this, &MainWindow::onLogMessage);
+    connect(serverWorker, &HttpServerWorker::started, this, &MainWindow::onServerStarted);
+    connect(serverWorker, &HttpServerWorker::stopped, this, &MainWindow::onServerStopped);
+    // worker 结束自动退出线程
+    connect(serverWorker, &HttpServerWorker::stopped, serverThread, &QThread::quit);
+    // 线程结束后删除 worker
+    connect(serverThread, &QThread::finished, serverWorker, &QObject::deleteLater);
+    // 线程结束后清理资源
+    connect(serverThread, &QThread::finished, this, [this]() {
+        this->serverWorker = nullptr;
+        this->serverThread = nullptr;
+    });
+
+    this->serverThread->start();
+
+    QString rootPath = ui->webRootPathLineEdit->text();
+    int port = stoi(ui->setverPortLineEdit->text().toStdString());
+    QMetaObject::invokeMethod(this->serverWorker, "startServer", Qt::QueuedConnection, Q_ARG(QString, rootPath), Q_ARG(int, port));
+    
     isServerRunning = true;
 }
 
@@ -49,9 +74,11 @@ void MainWindow::onStopServerBtnClicked() {
     }
 
     // 关闭服务器
-
-    isServerRunning = false;
-    enableControls();
+    if (serverWorker) {
+        // 防抖
+        ui->stopServerBtn->setEnabled(false);
+        QMetaObject::invokeMethod(serverWorker, "stopServer", Qt::QueuedConnection);
+    }
 }
 
 void MainWindow::disableControls() {
@@ -59,8 +86,6 @@ void MainWindow::disableControls() {
     ui->webRootPathBrowseBtn->setEnabled(false);
     ui->setverPortLineEdit->setEnabled(false);
     ui->startServerBtn->setEnabled(false);
-    ui->stopServerBtn->setEnabled(true);
-    ui->serverStatusLabel->setText("服务器运行中");
 }
 
 void MainWindow::enableControls() {
@@ -68,8 +93,22 @@ void MainWindow::enableControls() {
     ui->webRootPathBrowseBtn->setEnabled(true);
     ui->setverPortLineEdit->setEnabled(true);
     ui->startServerBtn->setEnabled(true);
+}
+
+void MainWindow::onServerStarted() {
+    ui->stopServerBtn->setEnabled(true);
+    ui->serverStatusLabel->setText("服务器运行中");
+}
+
+void MainWindow::onServerStopped() {
     ui->stopServerBtn->setEnabled(false);
     ui->serverStatusLabel->setText("服务器已停止");
+    this->isServerRunning = false;
+    enableControls();
+}
+
+void MainWindow::onLogMessage(QString message) {
+    qDebug() << message;
 }
 
 bool MainWindow::validateInput() {
@@ -95,5 +134,10 @@ bool MainWindow::validateInput() {
 }
 
 MainWindow::~MainWindow() {
+    onStopServerBtnClicked();
+    if (serverThread) {
+        serverThread->quit();
+        serverThread->wait(2000);
+    }
     delete ui;
 }

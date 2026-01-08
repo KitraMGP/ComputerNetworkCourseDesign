@@ -2,6 +2,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QThread>
+#include <httpserverworker.h>
 
 namespace Ui {
 class MainWindow;
@@ -18,10 +20,19 @@ class MainWindow : public QMainWindow {
     void browseServerRootDir();
     void onStartServerBtnClicked();
     void onStopServerBtnClicked();
+    void onLogMessage(QString message);
+    void onServerStarted();
+    void onServerStopped();
 
   private:
     Ui::MainWindow *ui;
     bool isServerRunning = false;
+    QThread* serverThread;
+    HttpServerWorker* serverWorker;
+    /**
+     * 启动服务器
+     */
+    void startServer();
     /**
      * 校验用户输入并弹窗报告错误
      */

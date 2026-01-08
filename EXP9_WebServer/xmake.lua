@@ -5,12 +5,13 @@ set_languages("c++23")
 target("./EXP9_WebServer/")
     add_rules("qt.widgetapp")
     add_packages("qt6core", "qt6widgets", "qt6gui")
-    add_headerfiles("src/*.h")
-    add_includedirs("src")
-    add_files("src/*.cpp")
+    add_headerfiles("src/**.h")
+    add_includedirs("src", "src/core")
+    add_files("src/**.cpp")
     add_files("src/mainwindow.ui")
     -- add files with Q_OBJECT meta (only for qt.moc)
     add_files("src/*.h")
+    add_files("src/core/*.h")
 
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
