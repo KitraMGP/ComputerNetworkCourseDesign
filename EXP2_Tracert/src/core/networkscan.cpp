@@ -24,7 +24,7 @@ const int MAX_ICMP_PACKET_SIZE = 1024;  // ICMP报文最大长度（包括报头
 
 // IP报头
 typedef struct {
-    uint8_t hdr_len : 4;      // 4位服务类型
+    uint8_t hdr_len : 4;      // 4位首部长度
     uint8_t version : 4;      // 4位版本号
     uint8_t tos;            // 8位服务类型
     uint16_t total_len;     // 16位总长度

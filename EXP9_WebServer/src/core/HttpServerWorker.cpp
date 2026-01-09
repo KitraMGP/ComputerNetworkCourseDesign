@@ -65,9 +65,7 @@ bool HttpServerWorker::startServer(QString rootPath, int port) {
     emit logMessage("开始监听传入连接");
     emit started();
 
-    // 让当前方法正常执行结束，在下一次界面消息循环的时候启动循环
-    // 启动的循环在 Worker 线程执行，不影响UI线程
-    QTimer::singleShot(0, this, &HttpServerWorker::processServerLoop);
+    processServerLoop();
     return true;
 }
 
