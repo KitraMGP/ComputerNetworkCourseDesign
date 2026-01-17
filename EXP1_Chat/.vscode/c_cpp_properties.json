@@ -5,6 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/**"
             ],
+            "compileCommands": "${workspaceFolder}/.vscode/compile_commands.json",
             "defines": [
                 // 用来解决 IntelliSense 报错
                 "_GNU_SOURCE"
